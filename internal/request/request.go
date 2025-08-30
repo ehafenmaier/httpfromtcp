@@ -1,6 +1,7 @@
 package request
 
 import (
+	"bytes"
 	"fmt"
 	"io"
 	"strings"
@@ -105,14 +106,14 @@ func (r *Request) parse(data []byte) (int, error) {
 
 func parseRequestLine(b []byte) (RequestLine, int, error) {
 	// Find the index of the first CRLF to isolate the request line
-	req := string(b)
-	idx := strings.Index(req, "\r\n")
+	rn := []byte("\r\n")
+	idx := bytes.Index(b, rn)
 	if idx == -1 {
 		return RequestLine{}, 0, nil
 	}
 
 	bytesConsumed := len(b)
-	rl := req[:idx]
+	rl := string(b[:idx])
 
 	// Split the request line into parts
 	parts := strings.Split(rl, " ")
