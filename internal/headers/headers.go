@@ -31,7 +31,8 @@ func (h Headers) Parse(data []byte) (n int, done bool, err error) {
 		}
 
 		// Parse the header line
-		key, value, err := parseHeaderLine(data[bytesConsumed : bytesConsumed+idx])
+		line := string(data[bytesConsumed : bytesConsumed+idx])
+		key, value, err := parseHeaderLine(line)
 		if err != nil {
 			return 0, false, err
 		}
@@ -50,8 +51,7 @@ func (h Headers) Parse(data []byte) (n int, done bool, err error) {
 	}
 }
 
-func parseHeaderLine(data []byte) (string, string, error) {
-	line := string(data)
+func parseHeaderLine(line string) (string, string, error) {
 	parts := strings.SplitN(line, ":", 2)
 
 	// If we don't have exactly two parts the header line is invalid
@@ -72,7 +72,7 @@ func parseHeaderLine(data []byte) (string, string, error) {
 		return "", "", fmt.Errorf("invalid header key: %s", parts[0])
 	}
 
-	// Header line is valid so return lowercased key and value
+	// Header line is valid so return lowercase key and value
 	key := strings.ToLower(strings.TrimSpace(parts[0]))
 	value := strings.TrimSpace(parts[1])
 
