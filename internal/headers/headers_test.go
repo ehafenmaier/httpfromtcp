@@ -53,4 +53,14 @@ func TestHeadersParse(t *testing.T) {
 	require.Error(t, err)
 	assert.Equal(t, 0, n)
 	assert.False(t, done)
+
+	// Test: Two valid headers with an existing header key
+	headers = NewHeaders()
+	headers["user-agent"] = "first-test-agent"
+	data = []byte("    Host: localhost:12345    \r\n  User-Agent:  second-test-agent   \r\n\r\n")
+	n, done, err = headers.Parse(data)
+	require.NoError(t, err)
+	require.NotNil(t, headers)
+	assert.Equal(t, "localhost:12345", headers["host"])
+	assert.Equal(t, "first-test-agent, second-test-agent", headers["user-agent"])
 }

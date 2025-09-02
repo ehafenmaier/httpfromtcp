@@ -36,8 +36,14 @@ func (h Headers) Parse(data []byte) (n int, done bool, err error) {
 			return 0, false, err
 		}
 
-		// Add the key value pair to the headers map
-		h[key] = value
+		// Check if the header key exists and if it does add the value to a
+		// comma-delimited list otherwise add the key and value
+		v, exists := h[key]
+		if exists {
+			h[key] = v + ", " + value
+		} else {
+			h[key] = value
+		}
 
 		// Increment the number of bytes consumed
 		bytesConsumed += idx + len(rn)
