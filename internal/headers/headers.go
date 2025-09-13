@@ -22,7 +22,7 @@ func (h Headers) Parse(data []byte) (n int, done bool, err error) {
 
 		// If not found we need more data
 		if idx == -1 {
-			return 0, false, nil
+			return bytesConsumed, false, nil
 		}
 
 		// If we find a CRLF at the start, we're done with headers

@@ -3,6 +3,7 @@ package request
 import (
 	"bytes"
 	"fmt"
+	"httpfromtcp/internal/headers"
 	"io"
 	"strings"
 )
@@ -13,11 +14,13 @@ type RequestState int
 
 const (
 	Initialized RequestState = iota
+	ParsingHeaders
 	Done
 )
 
 type Request struct {
 	RequestLine RequestLine
+	Headers     headers.Headers
 	State       RequestState
 }
 
@@ -34,7 +37,8 @@ func RequestFromReader(reader io.Reader) (*Request, error) {
 
 	// Create a new Request in the Initialized state
 	req := &Request{
-		State: Initialized,
+		State:   Initialized,
+		Headers: map[string]string{},
 	}
 
 	for req.State != Done {
@@ -80,6 +84,28 @@ func RequestFromReader(reader io.Reader) (*Request, error) {
 }
 
 func (r *Request) parse(data []byte) (int, error) {
+	totalBytesConsumed := 0
+	for r.State != Done {
+		bc, err := r.parseSingle(data[totalBytesConsumed:])
+		// If there's an error, return it
+		if err != nil {
+			return 0, fmt.Errorf("error parsing request: %w", err)
+		}
+
+		totalBytesConsumed += bc
+
+		// If no bytes were consumed, we need more data
+		if totalBytesConsumed == 0 {
+			return 0, nil
+		} else {
+			break
+		}
+	}
+
+	return totalBytesConsumed, nil
+}
+
+func (r *Request) parseSingle(data []byte) (int, error) {
 	switch r.State {
 	case Initialized:
 		// If the request is initialized, parse the request line
@@ -94,7 +120,24 @@ func (r *Request) parse(data []byte) (int, error) {
 		}
 		// Successfully parsed the request line
 		r.RequestLine = rl
-		r.State = Done
+		r.State = ParsingHeaders
+		return bc, nil
+	case ParsingHeaders:
+		// Parse the headers
+		bc, done, err := r.Headers.Parse(data)
+		// If there's an error parsing, return it
+		if err != nil {
+			return 0, err
+		}
+		// If headers are completely parsed, set the request state to done
+		if done {
+			r.State = Done
+		}
+		// If no bytes were consumed, we need more data
+		if bc == 0 {
+			return 0, nil
+		}
+		// Return the total bytes consumed
 		return bc, nil
 	case Done:
 		// If the request is done, something went wrong
