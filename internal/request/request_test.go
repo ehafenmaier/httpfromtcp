@@ -45,6 +45,28 @@ func TestRequestLineParse(t *testing.T) {
 	require.Error(t, err)
 }
 
+func TestRequestLineHeadersParse(t *testing.T) {
+	// Test: Standard Headers
+	reader := &chunkReader{
+		data:            "GET / HTTP/1.1\r\nHost: localhost:42069\r\nUser-Agent: curl/7.81.0\r\nAccept: */*\r\n\r\n",
+		numBytesPerRead: 3,
+	}
+	r, err := RequestFromReader(reader)
+	require.NoError(t, err)
+	require.NotNil(t, r)
+	assert.Equal(t, "localhost:42069", r.Headers["host"])
+	assert.Equal(t, "curl/7.81.0", r.Headers["user-agent"])
+	assert.Equal(t, "*/*", r.Headers["accept"])
+
+	// Test: Malformed Header
+	reader = &chunkReader{
+		data:            "GET / HTTP/1.1\r\nHost localhost:42069\r\n\r\n",
+		numBytesPerRead: 3,
+	}
+	r, err = RequestFromReader(reader)
+	require.Error(t, err)
+}
+
 type chunkReader struct {
 	data            string
 	numBytesPerRead int
@@ -52,7 +74,7 @@ type chunkReader struct {
 }
 
 // Read reads up to len(p) or numBytesPerRead bytes from the string per call
-// its useful for simulating reading a variable number of bytes per chunk from a network connection
+// It's useful for simulating reading a variable number of bytes per chunk from a network connection
 func (cr *chunkReader) Read(p []byte) (n int, err error) {
 	if cr.pos >= len(cr.data) {
 		return 0, io.EOF
