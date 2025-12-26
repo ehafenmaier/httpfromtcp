@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"httpfromtcp/internal/headers"
 	"io"
+	"strconv"
 	"strings"
 )
 
@@ -15,13 +16,16 @@ type RequestState int
 const (
 	Initialized RequestState = iota
 	ParsingHeaders
+	ParsingBody
 	Done
 )
 
 type Request struct {
-	RequestLine RequestLine
-	Headers     headers.Headers
-	State       RequestState
+	RequestLine   RequestLine
+	Headers       headers.Headers
+	Body          []byte
+	ContentLength int
+	State         RequestState
 }
 
 type RequestLine struct {
@@ -55,8 +59,12 @@ func RequestFromReader(reader io.Reader) (*Request, error) {
 			return nil, fmt.Errorf("error reading from reader: %w", err)
 		}
 
-		// If we read 0 bytes and got EOF, break
+		// If we read 0 bytes and got EOF we're done
 		if br == 0 && err == io.EOF {
+			// Check for valid content length
+			if req.ContentLength > 0 && len(req.Body) < req.ContentLength {
+				return nil, fmt.Errorf("request body smaller than specified content length")
+			}
 			req.State = Done
 			continue
 		}
@@ -97,9 +105,9 @@ func (r *Request) parse(data []byte) (int, error) {
 		// If no bytes were consumed, we need more data
 		if totalBytesConsumed == 0 {
 			return 0, nil
-		} else {
-			break
 		}
+
+		break
 	}
 
 	return totalBytesConsumed, nil
@@ -129,16 +137,42 @@ func (r *Request) parseSingle(data []byte) (int, error) {
 		if err != nil {
 			return 0, err
 		}
-		// If headers are completely parsed, set the request state to done
+		// If headers are completely parsed set the request state to parsing body
 		if done {
-			r.State = Done
+			r.State = ParsingBody
 		}
-		// If no bytes were consumed, we need more data
+		// If no bytes were consumed we need more data
 		if bc == 0 {
 			return 0, nil
 		}
 		// Return the total bytes consumed
 		return bc, nil
+	case ParsingBody:
+		// Check for content length header and if it doesn't exist we're done
+		if r.Headers.Get("content-length") == "" {
+			r.State = Done
+			return 0, nil
+		}
+		// Convert content length header value to an integer
+		cl, err := strconv.Atoi(r.Headers.Get("content-length"))
+		if err != nil {
+			return 0, err
+		}
+		// Set the content length to the header value and the
+		// body to the remaining data minus the leading "\r\n"
+		r.ContentLength = cl
+		r.Body = data[2:]
+		// If body is larger than specified content length return error
+		if len(r.Body) > r.ContentLength {
+			return 0, fmt.Errorf("request body larger than specified content length")
+		}
+		// If body equals specified content length we're done
+		if len(r.Body) == r.ContentLength {
+			r.State = Done
+			return 0, nil
+		}
+		// We need more data
+		return 0, nil
 	case Done:
 		// If the request is done, something went wrong
 		return 0, fmt.Errorf("trying to read data in a done state")
@@ -155,7 +189,7 @@ func parseRequestLine(b []byte) (RequestLine, int, error) {
 		return RequestLine{}, 0, nil
 	}
 
-	bytesConsumed := len(b)
+	bytesConsumed := idx + len(rn)
 	rl := string(b[:idx])
 
 	// Split the request line into parts

@@ -18,7 +18,8 @@ func (h Headers) Parse(data []byte) (n int, done bool, err error) {
 	bytesConsumed := 0
 	for {
 		// Find the index of the first CRLF
-		idx := bytes.Index(data[bytesConsumed:], rn)
+		array := data[bytesConsumed:]
+		idx := bytes.Index(array, rn)
 
 		// If not found we need more data
 		if idx == -1 {
@@ -49,6 +50,10 @@ func (h Headers) Parse(data []byte) (n int, done bool, err error) {
 		// Increment the number of bytes consumed
 		bytesConsumed += idx + len(rn)
 	}
+}
+
+func (h Headers) Get(key string) string {
+	return h[strings.ToLower(key)]
 }
 
 func parseHeaderLine(line string) (string, string, error) {
