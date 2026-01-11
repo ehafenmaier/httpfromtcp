@@ -54,7 +54,7 @@ func (s *Server) handle(conn net.Conn) {
 		"Content-Type: text/plain\r\n" +
 		"Content-Length: 13\r\n" +
 		"\r\n" +
-		"Hello World!"
+		"Hello World!\n"
 	_, err := conn.Write([]byte(response))
 	if err != nil {
 		fmt.Printf("Error writing message: %v\n", err)
