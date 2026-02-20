@@ -58,26 +58,28 @@ func (s *Server) listen() {
 func (s *Server) handle(conn net.Conn) {
 	defer conn.Close()
 
-	headers := response.GetDefaultHeaders(0)
 	r, err := request.RequestFromReader(conn)
 	if err != nil {
 		response.WriteStatusLine(conn, response.StatusBadRequest)
-		response.WriteHeaders(conn, headers)
+		response.WriteHeaders(conn, response.GetDefaultHeaders(0))
 		return
 	}
 
 	writer := bytes.NewBuffer([]byte{})
 	handlerError := s.handler(writer, r)
+
+	var status = response.StatusOK
+	var body []byte = nil
+
 	if handlerError != nil {
-		response.WriteStatusLine(conn, handlerError.StatusCode)
-		response.WriteHeaders(conn, headers)
-		conn.Write([]byte(handlerError.Message))
-		return
+		status = handlerError.StatusCode
+		body = []byte(handlerError.Message)
+	} else {
+		body = writer.Bytes()
 	}
 
-	body := writer.Bytes()
-	headers = response.GetDefaultHeaders(len(body))
-	response.WriteStatusLine(conn, response.StatusOK)
+	headers := response.GetDefaultHeaders(len(body))
+	response.WriteStatusLine(conn, status)
 	response.WriteHeaders(conn, headers)
 	conn.Write(body)
 }
