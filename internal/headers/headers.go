@@ -15,45 +15,45 @@ func NewHeaders() Headers {
 
 func (h Headers) Parse(data []byte) (n int, done bool, err error) {
 	rn := []byte("\r\n")
-	bytesConsumed := 0
-	for {
-		// Find the index of the first CRLF
-		array := data[bytesConsumed:]
-		idx := bytes.Index(array, rn)
 
-		// If not found we need more data
-		if idx == -1 {
-			return bytesConsumed, false, nil
-		}
+	// Find the index of the first CRLF
+	idx := bytes.Index(data, rn)
 
-		// If we find a CRLF at the start, we're done with headers
-		if idx == 0 {
-			return bytesConsumed, true, nil
-		}
-
-		// Parse the header line
-		line := string(data[bytesConsumed : bytesConsumed+idx])
-		key, value, err := parseHeaderLine(line)
-		if err != nil {
-			return 0, false, err
-		}
-
-		// Check if the header key exists and if it does add the value to a
-		// comma-delimited list otherwise add the key and value
-		v, exists := h[key]
-		if exists {
-			h[key] = v + ", " + value
-		} else {
-			h[key] = value
-		}
-
-		// Increment the number of bytes consumed
-		bytesConsumed += idx + len(rn)
+	// If not found we need more data
+	if idx == -1 {
+		return 0, false, nil
 	}
+
+	// If we find a CRLF at the start, we're done with headers
+	// Return the consumed CRLF bytes
+	if idx == 0 {
+		return len(rn), true, nil
+	}
+
+	// Parse the header line
+	line := string(data[:idx])
+	key, value, err := parseHeaderLine(line)
+	if err != nil {
+		return 0, false, err
+	}
+
+	// Check if the header key exists and if it does add the value to a
+	// comma-delimited list otherwise add the key and value
+	v, exists := h[key]
+	if exists {
+		h[key] = v + ", " + value
+	} else {
+		h[key] = value
+	}
+
+	// Return the number of bytes consumed plus the CRLF
+	return idx + len(rn), false, nil
 }
 
-func (h Headers) Get(key string) string {
-	return h[strings.ToLower(key)]
+func (h Headers) Get(key string) (string, bool) {
+
+	v, ok := h[strings.ToLower(key)]
+	return v, ok
 }
 
 func parseHeaderLine(line string) (string, string, error) {
