@@ -43,11 +43,12 @@ func RequestFromReader(reader io.Reader) (*Request, error) {
 	req := &Request{
 		State:   Initialized,
 		Headers: map[string]string{},
+		Body:    make([]byte, 0),
 	}
 
 	for req.State != Done {
 		// If the buffer is full double its size
-		if readToIndex == len(buf) {
+		if readToIndex >= len(buf) {
 			doubleBuf := make([]byte, len(buf)*2)
 			copy(doubleBuf, buf)
 			buf = doubleBuf
@@ -76,11 +77,6 @@ func RequestFromReader(reader io.Reader) (*Request, error) {
 			return nil, fmt.Errorf("error parsing request: %w", err)
 		}
 
-		// If no bytes were parsed, we need more data
-		if bp == 0 {
-			continue
-		}
-
 		// Remove the parsed bytes from the buffer
 		newBuf := make([]byte, len(buf))
 		copy(newBuf, buf[bp:])
@@ -103,11 +99,9 @@ func (r *Request) parse(data []byte) (int, error) {
 		totalBytesConsumed += bc
 
 		// If no bytes were consumed, we need more data
-		if totalBytesConsumed == 0 {
-			return 0, nil
+		if bc == 0 {
+			break
 		}
-
-		break
 	}
 
 	return totalBytesConsumed, nil
@@ -141,27 +135,24 @@ func (r *Request) parseSingle(data []byte) (int, error) {
 		if done {
 			r.State = ParsingBody
 		}
-		// If no bytes were consumed we need more data
-		if bc == 0 {
-			return 0, nil
-		}
 		// Return the total bytes consumed
 		return bc, nil
 	case ParsingBody:
 		// Check for content length header and if it doesn't exist we're done
-		if r.Headers.Get("content-length") == "" {
+		contentLen, ok := r.Headers.Get("Content-Length")
+		if !ok {
 			r.State = Done
 			return 0, nil
 		}
 		// Convert content length header value to an integer
-		cl, err := strconv.Atoi(r.Headers.Get("content-length"))
+		cl, err := strconv.Atoi(contentLen)
 		if err != nil {
 			return 0, err
 		}
 		// Set the content length to the header value and the
 		// body to the remaining data minus the leading "\r\n"
 		r.ContentLength = cl
-		r.Body = data[2:]
+		r.Body = append(r.Body, data...)
 		// If body is larger than specified content length return error
 		if len(r.Body) > r.ContentLength {
 			return 0, fmt.Errorf("request body larger than specified content length")
