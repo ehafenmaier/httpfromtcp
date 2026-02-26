@@ -2,10 +2,9 @@ package main
 
 import (
 	"httpfromtcp/internal/request"
+	"httpfromtcp/internal/response"
 	"httpfromtcp/internal/server"
-	"io"
 	"log"
-	"net/http"
 	"os"
 	"os/signal"
 	"syscall"
@@ -27,21 +26,59 @@ func main() {
 	log.Println("Server gracefully stopped")
 }
 
-func mainHandler(w io.Writer, req *request.Request) *server.HandlerError {
+func mainHandler(w *response.Writer, req *request.Request) {
 	if req.RequestLine.RequestTarget == "/yourproblem" {
-		return &server.HandlerError{
-			StatusCode: http.StatusBadRequest,
-			Message:    "Your problem is not my problem\n",
+		body := []byte("<html>\n<head>\n<title>400 Bad Request</title>\n</head>\n<body>\n" +
+			"<h1>Bad Request</h1>\n<p>Your request honestly kinda sucked.</p>\n" +
+			"</body>\n</html>")
+
+		err := w.WriteStatusLine(response.StatusBadRequest)
+		if err != nil {
+			log.Printf("Error writing status line: %v", err)
+		}
+		err = w.WriteHeaders(response.GetDefaultHeaders(len(body)))
+		if err != nil {
+			log.Printf("Error writing header: %v", err)
+		}
+		_, err = w.WriteBody(body)
+		if err != nil {
+			log.Printf("Error writing body: %v", err)
 		}
 	}
 
 	if req.RequestLine.RequestTarget == "/myproblem" {
-		return &server.HandlerError{
-			StatusCode: http.StatusInternalServerError,
-			Message:    "Woopsie, my bad\n",
+		body := []byte("<html>\n<head>\n<title>500 Internal Server Error</title>\n</head>\n<body>\n" +
+			"<h1>Internal Server Error</h1>\n<p>Okay, you know what? This one is on me.</p>\n" +
+			"</body>\n</html>")
+
+		err := w.WriteStatusLine(response.StatusInternalServerError)
+		if err != nil {
+			log.Printf("Error writing status line: %v", err)
+		}
+		err = w.WriteHeaders(response.GetDefaultHeaders(len(body)))
+		if err != nil {
+			log.Printf("Error writing header: %v", err)
+		}
+		_, err = w.WriteBody(body)
+		if err != nil {
+			log.Printf("Error writing body: %v", err)
 		}
 	}
 
-	w.Write([]byte("All good, frfr\n"))
-	return nil
+	body := []byte("<html>\n<head>\n<title>200 OK</title>\n</head>\n<body>\n" +
+		"<h1>Success!</h1>\n<p>Your request was an absolute banger.</p>\n" +
+		"</body>\n</html>")
+
+	err := w.WriteStatusLine(response.StatusOK)
+	if err != nil {
+		log.Printf("Error writing status line: %v", err)
+	}
+	err = w.WriteHeaders(response.GetDefaultHeaders(len(body)))
+	if err != nil {
+		log.Printf("Error writing header: %v", err)
+	}
+	_, err = w.WriteBody(body)
+	if err != nil {
+		log.Printf("Error writing body: %v", err)
+	}
 }

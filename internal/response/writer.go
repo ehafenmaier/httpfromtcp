@@ -1,7 +1,6 @@
 package response
 
 import (
-	"bytes"
 	"fmt"
 	"httpfromtcp/internal/headers"
 	"io"
@@ -20,9 +19,9 @@ const (
 	Body
 )
 
-func NewWriter() *Writer {
+func NewWriter(w io.Writer) *Writer {
 	return &Writer{
-		writer:      bytes.NewBuffer([]byte{}),
+		writer:      w,
 		writerState: StatusLine,
 	}
 }
@@ -72,6 +71,7 @@ func (w *Writer) WriteHeaders(headers headers.Headers) error {
 		return err
 	}
 
+	w.writerState = Body
 	return nil
 }
 
