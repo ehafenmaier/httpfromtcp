@@ -19,6 +19,8 @@ const (
 	Body
 )
 
+const CRLF = "\r\n"
+
 func NewWriter(w io.Writer) *Writer {
 	return &Writer{
 		writer:      w,
@@ -81,4 +83,17 @@ func (w *Writer) WriteBody(p []byte) (int, error) {
 	}
 
 	return w.writer.Write(p)
+}
+
+func (w *Writer) WriteChunkedBody(p []byte) (int, error) {
+	if w.writerState != Body {
+		return 0, fmt.Errorf("writer state is not Body")
+	}
+
+	p = append(p, []byte(CRLF)...)
+	return w.writer.Write(p)
+}
+
+func (w *Writer) WriteChunkedBodyDone() (int, error) {
+	return w.writer.Write([]byte(CRLF))
 }
