@@ -7,7 +7,6 @@ import (
 	"log"
 	"os"
 	"os/signal"
-	"strconv"
 	"syscall"
 )
 
@@ -28,40 +27,52 @@ func main() {
 }
 
 func mainHandler(w *response.Writer, req *request.Request) {
-	headers := response.GetDefaultHeaders(0)
-
 	if req.RequestLine.RequestTarget == "/yourproblem" {
-		body := []byte("<html>\n<head>\n<title>400 Bad Request</title>\n</head>\n<body>\n" +
-			"<h1>Bad Request</h1>\n<p>Your request honestly kinda sucked.</p>\n" +
-			"</body>\n</html>")
-
-		headers.Replace("Content-Type", "text/html")
-		headers.Replace("Content-Length", strconv.Itoa(len(body)))
-
-		w.WriteStatusLine(response.StatusBadRequest)
-		w.WriteHeaders(headers)
-		w.WriteBody(body)
+		mainHandler400(w, req)
+		return
 	}
 
 	if req.RequestLine.RequestTarget == "/myproblem" {
-		body := []byte("<html>\n<head>\n<title>500 Internal Server Error</title>\n</head>\n<body>\n" +
-			"<h1>Internal Server Error</h1>\n<p>Okay, you know what? This one is on me.</p>\n" +
-			"</body>\n</html>")
-
-		headers.Replace("Content-Type", "text/html")
-		headers.Replace("Content-Length", strconv.Itoa(len(body)))
-
-		w.WriteStatusLine(response.StatusInternalServerError)
-		w.WriteHeaders(headers)
-		w.WriteBody(body)
+		mainHandler500(w, req)
+		return
 	}
 
+	mainHandler200(w, req)
+}
+
+func mainHandler400(w *response.Writer, _ *request.Request) {
+	body := []byte("<html>\n<head>\n<title>400 Bad Request</title>\n</head>\n<body>\n" +
+		"<h1>Bad Request</h1>\n<p>Your request honestly kinda sucked.</p>\n" +
+		"</body>\n</html>")
+
+	headers := response.GetDefaultHeaders(len(body))
+	headers.Replace("Content-Type", "text/html")
+
+	w.WriteStatusLine(response.StatusBadRequest)
+	w.WriteHeaders(headers)
+	w.WriteBody(body)
+}
+
+func mainHandler500(w *response.Writer, _ *request.Request) {
+	body := []byte("<html>\n<head>\n<title>500 Internal Server Error</title>\n</head>\n<body>\n" +
+		"<h1>Internal Server Error</h1>\n<p>Okay, you know what? This one is on me.</p>\n" +
+		"</body>\n</html>")
+
+	headers := response.GetDefaultHeaders(len(body))
+	headers.Replace("Content-Type", "text/html")
+
+	w.WriteStatusLine(response.StatusInternalServerError)
+	w.WriteHeaders(headers)
+	w.WriteBody(body)
+}
+
+func mainHandler200(w *response.Writer, _ *request.Request) {
 	body := []byte("<html>\n<head>\n<title>200 OK</title>\n</head>\n<body>\n" +
 		"<h1>Success!</h1>\n<p>Your request was an absolute banger.</p>\n" +
 		"</body>\n</html>")
 
+	headers := response.GetDefaultHeaders(len(body))
 	headers.Replace("Content-Type", "text/html")
-	headers.Replace("Content-Length", strconv.Itoa(len(body)))
 
 	w.WriteStatusLine(response.StatusOK)
 	w.WriteHeaders(headers)
