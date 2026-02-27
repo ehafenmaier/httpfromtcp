@@ -90,10 +90,18 @@ func (w *Writer) WriteChunkedBody(p []byte) (int, error) {
 		return 0, fmt.Errorf("cannot write chunked body in state %d", w.writerState)
 	}
 
+	// Write length of data in hex
+	w.writer.Write([]byte(fmt.Sprintf("%04X%s", len(p), CRLF)))
+	// Append carriage return to data and write
 	p = append(p, []byte(CRLF)...)
-	return w.writer.Write(p)
+	w.writer.Write(p)
+
+	return len(p), nil
 }
 
 func (w *Writer) WriteChunkedBodyDone() (int, error) {
-	return w.writer.Write([]byte(CRLF))
+	w.writer.Write([]byte("0" + CRLF))
+	w.writer.Write([]byte(CRLF))
+
+	return 0, nil
 }

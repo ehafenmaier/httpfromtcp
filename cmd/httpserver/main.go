@@ -1,16 +1,21 @@
 package main
 
 import (
+	"fmt"
 	"httpfromtcp/internal/request"
 	"httpfromtcp/internal/response"
 	"httpfromtcp/internal/server"
+	"io"
 	"log"
+	"net/http"
 	"os"
 	"os/signal"
+	"strings"
 	"syscall"
 )
 
 const port = 42069
+const chunkedBufferSize = 1024
 
 func main() {
 	server, err := server.Serve(port, mainHandler)
@@ -27,6 +32,11 @@ func main() {
 }
 
 func mainHandler(w *response.Writer, req *request.Request) {
+	if strings.HasPrefix(req.RequestLine.RequestTarget, "/httpbin") {
+		chunkedHandler(w, req)
+		return
+	}
+
 	if req.RequestLine.RequestTarget == "/yourproblem" {
 		mainHandler400(w, req)
 		return
@@ -77,4 +87,42 @@ func mainHandler200(w *response.Writer, _ *request.Request) {
 	w.WriteStatusLine(response.StatusOK)
 	w.WriteHeaders(headers)
 	w.WriteBody(body)
+}
+
+func chunkedHandler(w *response.Writer, req *request.Request) {
+	// Trim the request target prefix to get the route parameter
+	param := strings.TrimPrefix(req.RequestLine.RequestTarget, "/httpbin/")
+
+	// Put together the response headers
+	headers := response.GetDefaultHeaders(0)
+	headers.Remove("Content-Length")
+	headers.Set("Transfer-Encoding", "chunked")
+
+	w.WriteStatusLine(response.StatusOK)
+	w.WriteHeaders(headers)
+
+	// Call httpbin.org api with route parameter
+	res, err := http.Get("https://httpbin.org/" + param)
+	if err != nil {
+		log.Println(err)
+	}
+	defer res.Body.Close()
+
+	buf := make([]byte, chunkedBufferSize)
+	for {
+		n, err := res.Body.Read(buf)
+		fmt.Printf("httpbin.org response body bytes read: %d\n", n)
+
+		if err != nil && err != io.EOF {
+			log.Println(err)
+			return
+		}
+
+		if n == 0 && err == io.EOF {
+			w.WriteChunkedBodyDone()
+			return
+		}
+
+		w.WriteChunkedBody(buf[:n])
+	}
 }
