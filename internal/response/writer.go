@@ -8,13 +8,13 @@ import (
 
 type Writer struct {
 	writer      io.Writer
-	writerState WriterState
+	writerState writerState
 }
 
-type WriterState int
+type writerState int
 
 const (
-	StatusLine WriterState = iota
+	StatusLine writerState = iota
 	Headers
 	Body
 )
@@ -30,7 +30,7 @@ func NewWriter(w io.Writer) *Writer {
 
 func (w *Writer) WriteStatusLine(statusCode StatusCode) error {
 	if w.writerState != StatusLine {
-		return fmt.Errorf("writer state is not StatusLine")
+		return fmt.Errorf("cannot write status line in state %d", w.writerState)
 	}
 
 	var response []byte
@@ -57,7 +57,7 @@ func (w *Writer) WriteStatusLine(statusCode StatusCode) error {
 
 func (w *Writer) WriteHeaders(headers headers.Headers) error {
 	if w.writerState != Headers {
-		return fmt.Errorf("writer state is not Headers")
+		return fmt.Errorf("cannot write headers in state %d", w.writerState)
 	}
 
 	var response []byte
@@ -79,7 +79,7 @@ func (w *Writer) WriteHeaders(headers headers.Headers) error {
 
 func (w *Writer) WriteBody(p []byte) (int, error) {
 	if w.writerState != Body {
-		return 0, fmt.Errorf("writer state is not Body")
+		return 0, fmt.Errorf("cannot write body in state %d", w.writerState)
 	}
 
 	return w.writer.Write(p)
@@ -87,7 +87,7 @@ func (w *Writer) WriteBody(p []byte) (int, error) {
 
 func (w *Writer) WriteChunkedBody(p []byte) (int, error) {
 	if w.writerState != Body {
-		return 0, fmt.Errorf("writer state is not Body")
+		return 0, fmt.Errorf("cannot write chunked body in state %d", w.writerState)
 	}
 
 	p = append(p, []byte(CRLF)...)
