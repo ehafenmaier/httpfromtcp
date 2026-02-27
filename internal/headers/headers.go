@@ -68,6 +68,10 @@ func (h Headers) Replace(key, value string) {
 	h[key] = value
 }
 
+func (h Headers) Remove(key string) {
+	delete(h, key)
+}
+
 func parseHeaderLine(line string) (string, string, error) {
 	parts := strings.SplitN(line, ":", 2)
 
