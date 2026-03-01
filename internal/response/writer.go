@@ -100,8 +100,7 @@ func (w *Writer) WriteChunkedBody(p []byte) (int, error) {
 }
 
 func (w *Writer) WriteChunkedBodyDone() (int, error) {
-	w.writer.Write([]byte("0" + CRLF))
-	w.writer.Write([]byte(CRLF))
+	w.writer.Write([]byte("0" + CRLF + CRLF))
 
 	return 0, nil
 }
