@@ -1,6 +1,7 @@
 package main
 
 import (
+	"crypto/sha256"
 	"fmt"
 	"httpfromtcp/internal/request"
 	"httpfromtcp/internal/response"
@@ -10,6 +11,7 @@ import (
 	"net/http"
 	"os"
 	"os/signal"
+	"strconv"
 	"strings"
 	"syscall"
 )
@@ -32,8 +34,13 @@ func main() {
 }
 
 func mainHandler(w *response.Writer, req *request.Request) {
-	if strings.HasPrefix(req.RequestLine.RequestTarget, "/httpbin") {
-		chunkedHandler(w, req)
+	if strings.HasPrefix(req.RequestLine.RequestTarget, "/httpbin/stream") {
+		streamHandler(w, req)
+		return
+	}
+
+	if strings.HasPrefix(req.RequestLine.RequestTarget, "/httpbin/html") {
+		htmlHandler(w, req)
 		return
 	}
 
@@ -89,7 +96,7 @@ func mainHandler200(w *response.Writer, _ *request.Request) {
 	w.WriteBody(body)
 }
 
-func chunkedHandler(w *response.Writer, req *request.Request) {
+func streamHandler(w *response.Writer, req *request.Request) {
 	// Trim the request target prefix to get the route parameter
 	param := strings.TrimPrefix(req.RequestLine.RequestTarget, "/httpbin/")
 
@@ -124,5 +131,50 @@ func chunkedHandler(w *response.Writer, req *request.Request) {
 		}
 
 		w.WriteChunkedBody(buf[:n])
+	}
+}
+
+func htmlHandler(w *response.Writer, req *request.Request) {
+	param := strings.TrimPrefix(req.RequestLine.RequestTarget, "/httpbin/")
+
+	// Put together the response headers
+	headers := response.GetDefaultHeaders(0)
+	headers.Remove("Content-Length")
+	headers.Set("Transfer-Encoding", "chunked")
+	headers.Set("Trailer", "X-Content-SHA256")
+	headers.Set("Trailer", "X-Content-Length")
+
+	w.WriteStatusLine(response.StatusOK)
+	w.WriteHeaders(headers)
+
+	// Call httpbin.org api with route parameter
+	res, err := http.Get("https://httpbin.org/" + param)
+	if err != nil {
+		log.Println(err)
+	}
+	defer res.Body.Close()
+
+	buf := make([]byte, chunkedBufferSize)
+	resBody := make([]byte, 0)
+	for {
+		n, err := res.Body.Read(buf)
+
+		if err != nil && err != io.EOF {
+			log.Println(err)
+			return
+		}
+
+		if n == 0 && err == io.EOF {
+			hash := fmt.Sprintf("%x", sha256.Sum256(resBody))
+			length := strconv.Itoa(len(resBody))
+			headers.Set("X-Content-SHA256", hash)
+			headers.Set("X-Content-Length", length)
+
+			w.WriteTrailers(headers)
+			return
+		}
+
+		w.WriteChunkedBody(buf[:n])
+		resBody = append(resBody, buf[:n]...)
 	}
 }
