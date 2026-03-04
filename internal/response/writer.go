@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"httpfromtcp/internal/headers"
 	"io"
+	"strings"
 )
 
 type Writer struct {
@@ -18,8 +19,6 @@ const (
 	Headers
 	Body
 )
-
-const CRLF = "\r\n"
 
 func NewWriter(w io.Writer) *Writer {
 	return &Writer{
@@ -91,16 +90,35 @@ func (w *Writer) WriteChunkedBody(p []byte) (int, error) {
 	}
 
 	// Write length of data in hex
-	w.writer.Write([]byte(fmt.Sprintf("%04X%s", len(p), CRLF)))
+	w.writer.Write([]byte(fmt.Sprintf("%04X\r\n", len(p))))
 	// Append carriage return to data and write
-	p = append(p, []byte(CRLF)...)
+	p = append(p, []byte("\r\n")...)
 	w.writer.Write(p)
 
 	return len(p), nil
 }
 
 func (w *Writer) WriteChunkedBodyDone() (int, error) {
-	w.writer.Write([]byte("0" + CRLF + CRLF))
+	w.writer.Write([]byte("0\r\n\r\n"))
 
 	return 0, nil
+}
+
+func (w *Writer) WriteTrailers(h headers.Headers) error {
+	w.writer.Write([]byte("0\r\n"))
+	trailers, ok := h.Get("Trailer")
+	if !ok {
+		return fmt.Errorf("trailer header not found")
+	}
+
+	trailerKeys := strings.Split(trailers, ", ")
+	for _, key := range trailerKeys {
+		value, ok := h.Get(key)
+		if ok {
+			w.writer.Write([]byte(fmt.Sprintf("%s: %s\r\n", key, value)))
+		}
+	}
+	w.writer.Write([]byte("\r\n"))
+
+	return nil
 }
