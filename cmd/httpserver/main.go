@@ -54,6 +54,11 @@ func mainHandler(w *response.Writer, req *request.Request) {
 		return
 	}
 
+	if req.RequestLine.RequestTarget == "/video" {
+		videoHandler(w, req)
+		return
+	}
+
 	mainHandler200(w, req)
 }
 
@@ -177,4 +182,20 @@ func htmlHandler(w *response.Writer, req *request.Request) {
 		w.WriteChunkedBody(buf[:n])
 		resBody = append(resBody, buf[:n]...)
 	}
+}
+
+func videoHandler(w *response.Writer, _ *request.Request) {
+	// Read the video file into the response body
+	body, err := os.ReadFile("assets/vim.mp4")
+	if err != nil {
+		log.Println(err)
+	}
+
+	// Put together the response headers
+	headers := response.GetDefaultHeaders(len(body))
+	headers.Replace("Content-Type", "video/mp4")
+
+	w.WriteStatusLine(response.StatusOK)
+	w.WriteHeaders(headers)
+	w.WriteBody(body)
 }
